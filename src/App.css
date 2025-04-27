@@ -1,42 +1,34 @@
 /* Add some basic styling */
 .App {
-	/* font-family: sans-serif; */ /* Removed to inherit Poppins */
 	padding: 20px;
 	max-width: 1400px; /* Increased max width for wider table */
 	margin: 0 auto; /* Center the app */
 }
 
 label {
-	/* display: block; */ /* Keep labels inline where appropriate */
-	/* margin-bottom: 10px; */ /* Removed, handled by form container */
-	/* margin-right: 5px; */ /* Removed, handled by gap or specific spacing */
 	display: inline-flex; /* Use flexbox for alignment */
 	align-items: center; /* Vertically center items */
 	gap: 4px; /* Space between radio/checkbox and text */
 	margin-right: 10px; /* Space between label groups */
 }
 
-/* Allow inline display for radio button groups */
-/* label[style*='inline-block'] { */ /* Removed, handled by inline-flex */
-/* 	display: inline-block !important; */
-/* 	margin-right: 15px; */ /* Space between radio options */
-/* } */
-
-input[type='number'] {
-	margin-left: 5px;
-	padding: 5px;
-	border: 1px solid #ccc;
-	border-radius: 4px;
-	width: 100px; /* Give inputs a consistent width */
-}
-
-/* Style for text input */
+/* Combine common input styles */
+input[type='number'],
 input[type='text'] {
 	margin-left: 5px;
 	padding: 5px;
-	border: 1px solid #ccc;
-	border-radius: 4px;
-	/* width: 150px; */ /* Example width, adjust as needed */
+	/* Remove existing border and radius */
+	border: none;
+	border-radius: 0;
+	/* Add only a bottom border */
+	border-bottom: 1px solid #ccc;
+	/* Optional: Make background transparent if needed */
+	background-color: transparent;
+	outline: none; /* Remove focus outline */
+}
+
+input[type='number'] {
+	width: 100px; /* Give inputs a consistent width */
 }
 
 /* Style for radio buttons */
@@ -53,9 +45,6 @@ input[type='radio'] {
 	top: 2px; /* Nudge down slightly to better align with text */
 	cursor: pointer;
 	outline: none; /* Remove default focus outline */
-	/* vertical-align: middle; */ /* No longer needed with flex */
-	margin-left: 0; /* Reset margin, gap handles spacing */
-	margin-right: 0; /* Reset margin, gap handles spacing */
 	flex-shrink: 0; /* Prevent shrinking if label text is long */
 }
 
@@ -83,6 +72,7 @@ input[type='radio']:focus {
 	box-shadow: 0 0 0 2px rgba(218, 165, 32, 0.4); /* Goldenrod focus ring */
 }
 
+/* Base button styles */
 button {
 	padding: 8px 15px;
 	background-color: #daa520; /* Changed primary button color to goldenrod */
@@ -98,15 +88,16 @@ button:hover {
 	background-color: #b8860b; /* Darker goldenrod for hover */
 }
 
-/* Smaller remove button for table */
+/* Specific button styles */
 .remove-button-small {
 	padding: 3px 8px;
 	font-size: 0.8em;
 	margin-top: 0; /* Reset margin for table context */
-	background-color: #dc3545;
+	background-color: #f08080; /* Lighter red (LightCoral) */
+	color: #000000; /* Black text for better contrast */
 }
 .remove-button-small:hover {
-	background-color: #c82333;
+	background-color: #e07070; /* Slightly darker red for hover */
 }
 
 hr {
@@ -132,6 +123,7 @@ table {
 	min-width: 1200px; /* Adjusted min-width based on more columns/widths */
 }
 
+/* Common table cell styles */
 th,
 td {
 	border: 1px solid #ddd;
@@ -143,7 +135,6 @@ td {
 th {
 	background-color: #f2f2f2; /* Header background */
 	font-weight: bold;
-	/* text-align: center; */ /* Remove general center alignment for headers */
 	position: sticky; /* Make headers sticky */
 	top: 0; /* Stick to the top */
 	z-index: 10; /* Ensure headers stay above scrolling body content */
@@ -155,7 +146,7 @@ th {
 
 .sticky-col {
 	position: sticky;
-	background-color: #fff; /* Default background for sticky body cells */
+	/* Default background removed, handled by row styles */
 }
 
 /* Column 1: Year */
@@ -165,6 +156,9 @@ th {
 	min-width: var(--col-1-width);
 	max-width: var(--col-1-width);
 	z-index: 5;
+	&:not(th) {
+		border-bottom: 2px solid #ccc; /* Add a subtle border below the separator row */
+	}
 }
 
 /* Column 2: Name */
@@ -178,12 +172,9 @@ th {
 
 /* Column 3: Beginning Balance */
 .sticky-col-3 {
-	/* Position after col 1 and col 2 */
-	left: calc(var(--col-1-width) + var(--col-2-width));
 	width: var(--col-3-width);
 	min-width: var(--col-3-width);
 	max-width: var(--col-3-width);
-	z-index: 3;
 }
 
 /* Sticky Header Specific Styles */
@@ -200,9 +191,6 @@ thead .sticky-col-1 {
 thead .sticky-col-2 {
 	z-index: 16;
 }
-thead .sticky-col-3 {
-	z-index: 15;
-}
 
 /* Text Alignment Classes */
 .text-center {
@@ -215,28 +203,17 @@ thead .sticky-col-3 {
 	text-align: right !important;
 }
 
-/* Add alternating row colors */
-.scenario-even {
+/* Alternating row colors and sticky cell backgrounds */
+tbody tr.scenario-odd,
+tbody tr.scenario-odd .sticky-col {
+	background-color: #ffffff;
+}
+tbody tr.scenario-even,
+tbody tr.scenario-even .sticky-col {
 	background-color: #f9f9f9;
 }
 
-.scenario-odd {
-	background-color: #ffffff;
-}
-
-/* Ensure sticky cells get the correct alternating background */
-.scenario-even .sticky-col {
-	background-color: #f9f9f9;
-}
-.scenario-odd .sticky-col {
-	background-color: #ffffff;
-}
-
-/* Ensure sticky header cells always have header background */
-thead .scenario-even .sticky-col,
-thead .scenario-odd .sticky-col {
-	background-color: #f2f2f2;
-}
+/* Ensure sticky header cells always have header background (redundant rule removed) */
 
 /* Style for ended scenarios */
 .scenario-ended {
@@ -246,13 +223,6 @@ thead .scenario-odd .sticky-col {
 .scenario-ended td:nth-child(2) {
 	/* Ensure sticky background matches row color even when ended */
 	background-color: inherit;
-}
-
-tbody tr.scenario-odd {
-	background-color: #f9f9f9;
-}
-tbody tr.scenario-even {
-	background-color: #ffffff;
 }
 
 tbody tr:hover {
@@ -308,8 +278,6 @@ tbody tr:hover {
 h1 {
 	font-size: 2.2em; /* Increase size for main title */
 	margin-bottom: 20px; /* Add space below main title */
-	/* text-align: center; */ /* Removed centering */
-	/* text-align: left; */ /* Removed explicit left alignment */
 }
 
 h2 {
@@ -318,15 +286,9 @@ h2 {
 	margin-bottom: 15px; /* Add space below section titles */
 	border-bottom: 1px solid #eee; /* Optional: Add a subtle line below */
 	padding-bottom: 5px; /* Space between text and border */
-	/* text-align: left; */ /* Removed explicit left alignment */
 }
 
 /* --- Add Scenario Form Spacing --- */
 .add-scenario-form > div {
 	margin-bottom: 15px; /* Add space below each form row */
 }
-
-/* Optional: Remove default label margin if it causes too much space */
-/* .add-scenario-form > div > label {
-  margin-bottom: 0; 
-} */

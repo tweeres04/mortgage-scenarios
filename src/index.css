@@ -1,36 +1,72 @@
 @import 'tailwindcss';
 
 :root {
+	/* Font */
 	font-family: 'Poppins', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 	line-height: 1.5;
 	font-weight: 400;
-
-	color-scheme: light dark;
-	color: rgba(255, 255, 255, 0.87);
-	background-color: #242424;
-
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+
+	/* Default Light Theme Colors */
+	--color-text: #213547;
+	--color-background: #ffffff;
+	--color-background-soft: #f9f9f9;
+	--color-background-mute: #f2f2f2;
+	--color-border: #ddd;
+	--color-border-strong: #ccc;
+	--color-primary: #646cff;
+	--color-primary-hover: #535bf2;
+	--color-primary-focus: #747bff;
+	--color-button-text: #ffffff;
+	--color-button-bg: #1a1a1a;
+	--color-button-hover-border: var(--color-primary);
+	--color-link: var(--color-primary);
+	--color-link-hover: var(--color-primary-hover);
+
+	color-scheme: light dark;
+	color: var(--color-text);
+	background-color: var(--color-background);
+}
+
+/* Dark Theme Overrides */
+@media (prefers-color-scheme: dark) {
+	:root {
+		--color-text: rgba(255, 255, 255, 0.87);
+		--color-background: #242424;
+		--color-background-soft: #3a3a3a;
+		--color-background-mute: #484848;
+		--color-border: #555;
+		--color-border-strong: #777;
+		--color-primary: #747bff; /* Lighter blue for dark mode */
+		--color-primary-hover: #9d9fea;
+		--color-primary-focus: #a8afff;
+		--color-button-text: rgba(255, 255, 255, 0.87);
+		--color-button-bg: #1a1a1a; /* Keep dark button bg */
+		--color-button-hover-border: var(--color-primary);
+		--color-link: var(--color-primary);
+		--color-link-hover: var(--color-primary-hover);
+	}
 }
 
 a {
 	font-weight: 500;
-	color: #646cff;
+	color: var(--color-link);
 	text-decoration: inherit;
 }
 a:hover {
-	color: #535bf2;
+	color: var(--color-link-hover);
 }
 
 body {
 	margin: 0;
-	/* display: flex; */ /* Removed */
-	/* place-items: center; */ /* Removed */
 	min-width: 320px;
 	min-height: 100vh;
 	font-family: 'Poppins', sans-serif; /* Apply Poppins font */
+	background-color: var(--color-background); /* Use variable */
+	color: var(--color-text); /* Use variable */
 }
 
 h1 {
@@ -44,28 +80,15 @@ button {
 	padding: 0.6em 1.2em;
 	font-size: 1em;
 	font-weight: 500;
-	/* font-family: inherit; */ /* Remove inherit to ensure Poppins is used */
-	background-color: #1a1a1a;
+	background-color: var(--color-button-bg);
+	color: var(--color-button-text); /* Use variable */
 	cursor: pointer;
 	transition: border-color 0.25s;
 }
 button:hover {
-	border-color: #646cff;
+	border-color: var(--color-button-hover-border);
 }
 button:focus,
 button:focus-visible {
-	outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-	:root {
-		color: #213547;
-		background-color: #ffffff;
-	}
-	a:hover {
-		color: #747bff;
-	}
-	button {
-		background-color: #f9f9f9;
-	}
+	outline: 4px auto -webkit-focus-ring-color; /* Consider variable if needed */
 }

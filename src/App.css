@@ -3,6 +3,8 @@
 	padding: 20px;
 	max-width: 1400px; /* Increased max width for wider table */
 	margin: 0 auto; /* Center the app */
+	color: var(--color-text); /* Use variable */
+	background-color: var(--color-background); /* Use variable */
 }
 
 label {
@@ -21,9 +23,10 @@ input[type='text'] {
 	border: none;
 	border-radius: 0;
 	/* Add only a bottom border */
-	border-bottom: 1px solid #ccc;
+	border-bottom: 1px solid var(--color-border-strong); /* Use variable */
 	/* Optional: Make background transparent if needed */
 	background-color: transparent;
+	color: var(--color-text); /* Use variable for input text */
 	outline: none; /* Remove focus outline */
 }
 
@@ -38,9 +41,9 @@ input[type='radio'] {
 	-moz-appearance: none;
 	width: 16px; /* Set a size */
 	height: 16px;
-	border: 2px solid #b8860b; /* Darker gold border */
+	border: 2px solid #b8860b; /* Darker gold border - Keep specific color for now or create variable */
 	border-radius: 50%; /* Make it circular */
-	background-color: white; /* Default background */
+	background-color: var(--color-background); /* Use variable */
 	position: relative; /* For positioning the inner dot AND vertical adjustment */
 	top: 2px; /* Nudge down slightly to better align with text */
 	cursor: pointer;
@@ -55,7 +58,7 @@ input[type='radio']:checked::before {
 	width: 8px; /* Size of the inner dot */
 	height: 8px;
 	border-radius: 50%;
-	background-color: #daa520; /* Goldenrod color */
+	background-color: #daa520; /* Goldenrod color - Keep specific color for now or create variable */
 	position: absolute;
 	top: 50%;
 	left: 50%;
@@ -64,19 +67,19 @@ input[type='radio']:checked::before {
 
 /* Optional: Style on hover */
 input[type='radio']:hover {
-	border-color: #daa520; /* Lighter gold on hover */
+	border-color: #daa520; /* Lighter gold on hover - Keep specific color for now or create variable */
 }
 
 /* Optional: Style on focus */
 input[type='radio']:focus {
-	box-shadow: 0 0 0 2px rgba(218, 165, 32, 0.4); /* Goldenrod focus ring */
+	box-shadow: 0 0 0 2px rgba(218, 165, 32, 0.4); /* Goldenrod focus ring - Keep specific color for now or create variable */
 }
 
 /* Base button styles */
 button {
 	padding: 8px 15px;
-	background-color: #daa520; /* Changed primary button color to goldenrod */
-	color: white;
+	background-color: #daa520; /* Specific color for app buttons - Keep or make variable e.g., --color-accent */
+	color: var(--color-button-text); /* Use variable */
 	border: none;
 	border-radius: 4px;
 	cursor: pointer;
@@ -85,7 +88,7 @@ button {
 }
 
 button:hover {
-	background-color: #b8860b; /* Darker goldenrod for hover */
+	background-color: #b8860b; /* Darker goldenrod for hover - Keep or make variable */
 }
 
 /* Specific button styles */
@@ -93,15 +96,17 @@ button:hover {
 	padding: 3px 8px;
 	font-size: 0.8em;
 	margin-top: 0; /* Reset margin for table context */
-	background-color: #f08080; /* Lighter red (LightCoral) */
-	color: #000000; /* Black text for better contrast */
+	background-color: #f08080; /* Lighter red (LightCoral) - Keep or make variable e.g., --color-danger */
+	color: #000000; /* Black text for better contrast - Consider var(--color-danger-text) */
 }
 .remove-button-small:hover {
-	background-color: #e07070; /* Slightly darker red for hover */
+	background-color: #e07070; /* Slightly darker red for hover - Keep or make variable */
 }
 
 hr {
 	margin: 20px 0;
+	border: none; /* Remove default */
+	border-top: 1px solid var(--color-border); /* Use variable */
 }
 
 /* Add a container for table scrolling */
@@ -110,7 +115,7 @@ hr {
 	overflow-x: auto; /* Enable horizontal scrolling */
 	position: relative; /* Needed for sticky positioning context */
 	margin-top: 20px; /* Add some space above the table */
-	border: 1px solid #ddd; /* Add border around scrollable area */
+	border: 1px solid var(--color-border); /* Use variable */
 	/* Define column widths as CSS variables for easier calculation */
 	--col-1-width: 60px;
 	--col-2-width: 130px; /* Increased width for Name */
@@ -126,14 +131,15 @@ table {
 /* Common table cell styles */
 th,
 td {
-	border: 1px solid #ddd;
+	border: 1px solid var(--color-border); /* Use variable */
 	padding: 8px 10px; /* Adjust padding */
 	text-align: right; /* Default align numbers to the right */
 	white-space: nowrap; /* Prevent text wrapping */
+	color: var(--color-text); /* Ensure text color uses variable */
 }
 
 th {
-	background-color: #f2f2f2; /* Header background */
+	background-color: var(--color-background-mute); /* Use variable */
 	font-weight: bold;
 	position: sticky; /* Make headers sticky */
 	top: 0; /* Stick to the top */
@@ -157,7 +163,7 @@ th {
 	max-width: var(--col-1-width);
 	z-index: 5;
 	&:not(th) {
-		border-bottom: 2px solid #ccc; /* Add a subtle border below the separator row */
+		border-bottom: 2px solid var(--color-border-strong); /* Use variable */
 	}
 }
 
@@ -179,7 +185,7 @@ th {
 
 /* Sticky Header Specific Styles */
 thead .sticky-col {
-	background-color: #f2f2f2; /* Match header background */
+	background-color: var(--color-background-mute); /* Use variable */
 	z-index: 15; /* Higher z-index for header cells */
 	white-space: normal; /* Allow header text to wrap */
 	vertical-align: middle; /* Align wrapped text vertically */
@@ -206,18 +212,18 @@ thead .sticky-col-2 {
 /* Alternating row colors and sticky cell backgrounds */
 tbody tr.scenario-odd,
 tbody tr.scenario-odd .sticky-col {
-	background-color: #ffffff;
+	background-color: var(--color-background); /* Use variable */
 }
 tbody tr.scenario-even,
 tbody tr.scenario-even .sticky-col {
-	background-color: #f9f9f9;
+	background-color: var(--color-background-soft); /* Use variable */
 }
 
 /* Ensure sticky header cells always have header background (redundant rule removed) */
 
 /* Style for ended scenarios */
 .scenario-ended {
-	color: #999;
+	color: #999; /* Keep grey or use a variable like --color-text-muted */
 }
 .scenario-ended td:nth-child(1),
 .scenario-ended td:nth-child(2) {
@@ -225,8 +231,9 @@ tbody tr.scenario-even .sticky-col {
 	background-color: inherit;
 }
 
-tbody tr:hover {
-	background-color: #eef;
+tbody tr:hover,
+tbody tr:hover .sticky-col /* Apply hover to sticky columns too */ {
+	background-color: var(--color-background-mute); /* Use variable for hover */
 }
 
 /* --- Scenario Summaries Styles --- */
@@ -238,10 +245,10 @@ tbody tr:hover {
 }
 
 .scenario-summary-card {
-	border: 1px solid #ccc;
+	border: 1px solid var(--color-border); /* Use variable */
 	border-radius: 5px;
 	padding: 15px;
-	background-color: #f9f9f9;
+	background-color: var(--color-background-soft); /* Use variable */
 	min-width: 200px; /* Ensure cards have some minimum width */
 	box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
 }
@@ -249,7 +256,7 @@ tbody tr:hover {
 .scenario-summary-card h3 {
 	margin-top: 0;
 	margin-bottom: 10px;
-	border-bottom: 1px solid #eee;
+	border-bottom: 1px solid var(--color-border); /* Use variable */
 	padding-bottom: 5px;
 }
 
@@ -267,7 +274,7 @@ tbody tr:hover {
 /* Add CSS rules for the .year-separator class to create visual spacing between years in the table */
 .table-container table tbody tr.year-separator td {
 	padding-bottom: 10px; /* Add padding to the bottom of cells in the separator row */
-	border-bottom: 2px solid #ccc; /* Add a subtle border below the separator row */
+	border-bottom: 2px solid var(--color-border-strong); /* Use variable */
 }
 
 /* Optional: Adjust spacing if needed */
@@ -284,7 +291,7 @@ h2 {
 	font-size: 1.6em; /* Increase size for section titles */
 	margin-top: 30px; /* Add space above section titles */
 	margin-bottom: 15px; /* Add space below section titles */
-	border-bottom: 1px solid #eee; /* Optional: Add a subtle line below */
+	border-bottom: 1px solid var(--color-border); /* Use variable */
 	padding-bottom: 5px; /* Space between text and border */
 }
 

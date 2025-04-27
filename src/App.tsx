@@ -766,14 +766,26 @@ function App() {
 	}[] = useMemo(() => {
 		return [
 			{ key: 'totalNetWorth', name: 'Net Worth', style: 'solid' as const },
-			{ key: 'totalPrincipalPaid', name: 'Principal Paid', style: 'dashed' as const },
-			{ key: 'totalInterestPaid', name: 'Interest Paid', style: 'dotted' as const },
+			{
+				key: 'totalPrincipalPaid',
+				name: 'Principal Paid',
+				style: 'dashed' as const,
+			},
+			{
+				key: 'totalInterestPaid',
+				name: 'Interest Paid',
+				style: 'dotted' as const,
+			},
 			{
 				key: 'cumulativeInvestmentValue',
 				name: 'Investment Value',
 				style: 'dash-dot' as const,
 			},
-			{ key: 'endingBalance', name: 'Ending Balance', style: 'short-dash' as const },
+			{
+				key: 'endingBalance',
+				name: 'Ending Balance',
+				style: 'short-dash' as const,
+			},
 		]
 	}, []) // Empty dependency array ensures this is created only once
 

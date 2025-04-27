@@ -465,11 +465,22 @@ function App() {
 		fetch('/config.yaml') // Fetch from the public root
 			.then((response) => {
 				if (!response.ok) {
+					// If file not found (404), don't treat as a fatal error
+					if (response.status === 404) {
+						console.warn('config.yaml not found. Starting with empty state.')
+						return null // Signal that config is missing but it's okay
+					}
+					// For other errors, throw to be caught below
 					throw new Error(`HTTP error! status: ${response.status}`)
 				}
 				return response.text()
 			})
 			.then((yamlText) => {
+				// If response was null (404), skip parsing
+				if (yamlText === null) {
+					setConfigData(null) // Ensure configData is null
+					return
+				}
 				try {
 					const loadedConfig = jsyaml.load(yamlText) as ConfigData
 					// Basic validation of loaded config structure
@@ -486,12 +497,18 @@ function App() {
 					console.error('Error parsing YAML:', e)
 					// Type assertion or check needed if accessing specific properties of e
 					const errorMessage = e instanceof Error ? e.message : String(e)
+					// Set error only if parsing fails, not if file was just missing
 					setConfigError(`Error parsing config.yaml: ${errorMessage}`)
 				}
 			})
 			.catch((error) => {
+				// Catch errors thrown from response.ok check or other network issues
 				console.error('Error fetching config.yaml:', error)
-				setConfigError(`Error fetching config.yaml: ${error.message}`)
+				// Don't set configError here if it was a 404 handled above
+				// Only set for actual fetch errors (network, CORS, etc.)
+				if (!error.message.includes('status: 404')) {
+					setConfigError(`Error fetching config.yaml: ${error.message}`)
+				}
 			})
 			.finally(() => {
 				setLoadingConfig(false)
@@ -500,9 +517,11 @@ function App() {
 
 	// Initialize state *after* config is loaded
 	// We use default values initially or while loading
-	const [homePrice, setHomePrice] = useState<number>(configData?.homePrice ?? 0)
+	const [homePrice, setHomePrice] = useState<number>(
+		configData?.homePrice ?? 500000
+	) // Example default
 	const [initialInvestments, setInitialInvestments] = useState<number>(
-		configData?.initialInvestments ?? 0
+		configData?.initialInvestments ?? 100000 // Example default
 	)
 	const [scenarios, setScenarios] = useState<Scenario[]>([])
 
@@ -517,8 +536,15 @@ function App() {
 				configData.initialScenarios
 			)
 			setScenarios(initialScenarios)
+		} else if (!loadingConfig) {
+			// If loading is finished and configData is still null (e.g., 404 or parse error)
+			// Ensure state uses defaults (already set by useState initial values)
+			// Or explicitly set defaults here if preferred
+			setHomePrice(500000) // Ensure default
+			setInitialInvestments(100000) // Ensure default
+			setScenarios([]) // Ensure empty scenarios
 		}
-	}, [configData]) // Re-run when configData changes
+	}, [configData, loadingConfig]) // Add loadingConfig dependency
 
 	// State for the new scenario form
 	// Removed newScenarioType, newInitialMonthlyRent, newAnnualRentIncrease

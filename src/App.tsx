@@ -11,8 +11,12 @@ import {
 	ResponsiveContainer,
 } from 'recharts'
 import './App.css'
-// import configData from './config.json'; // Remove JSON import
 import jsyaml from 'js-yaml' // Import js-yaml
+
+// Import extracted components
+import ScenarioTableRow from './ScenarioTableRow'
+import ScenarioSummaryCard from './ScenarioSummaryCard'
+import AddScenarioForm from './AddScenarioForm'
 
 // Define an interface for the expected structure of config.yaml
 interface ConfigData {
@@ -27,7 +31,8 @@ interface ConfigData {
 	}>
 }
 
-interface Scenario {
+// Export types so they can be imported by other components
+export interface Scenario {
 	name: string
 	downPayment: number // No longer optional
 	downPaymentInput: number // No longer optional
@@ -38,7 +43,7 @@ interface Scenario {
 	yearlyData: YearlyPaymentData[] // No longer optional
 }
 
-interface YearlyPaymentData {
+export interface YearlyPaymentData {
 	year: number
 	beginningBalance: number
 	interestPaidYearly: number
@@ -55,36 +60,49 @@ interface YearlyPaymentData {
 	netWorthDifference?: number // Now represents Year-over-Year change for the scenario
 }
 
+// Helper function to calculate actual down payment
+const getActualDownPayment = (
+	homePrice: number,
+	downPaymentInput: number,
+	downPaymentType: 'amount' | 'percent'
+): number => {
+	return downPaymentType === 'amount'
+		? downPaymentInput
+		: homePrice * (downPaymentInput / 100)
+}
+
 // Update return type
 function calculateMortgageAmortization(
 	principal: number,
 	annualRate: number,
 	termYears: number
 ): { yearlyData: YearlyPaymentData[]; monthlyPayment: number } | null {
-	// Ensure principal = 0 is handled correctly, especially if rate is also 0
+	// Basic validation
 	if (principal < 0 || annualRate < 0 || termYears <= 0) {
 		return null // Invalid input for negative values or zero term
 	}
+
+	// Handle 0 principal (e.g., 100% down payment)
 	if (principal === 0) {
-		if (annualRate === 0) {
-			// 100% down payment, 0% interest - loan is immediately paid off
-			const yearlyDataForZeroPrincipal = [
-				{
-					year: 1, // Representing the state at the start/end of year 1
-					beginningBalance: 0,
-					interestPaidYearly: 0,
-					principalPaidYearly: 0, // No principal paid via loan payments
-					endingBalance: 0,
-					totalPrincipalPaid: 0,
-					totalInterestPaid: 0,
-					annualCost: 0, // Add annual cost
-				},
-			]
-			return { yearlyData: yearlyDataForZeroPrincipal, monthlyPayment: 0 }
-		} else {
+		if (annualRate !== 0) {
 			// Cannot have interest on a zero principal loan
-			return null
+			console.warn('Interest rate ignored for zero principal loan.')
+			annualRate = 0
 		}
+		// Loan is immediately paid off
+		const yearlyDataForZeroPrincipal: YearlyPaymentData[] = [
+			{
+				year: 1,
+				beginningBalance: 0,
+				interestPaidYearly: 0,
+				principalPaidYearly: 0,
+				endingBalance: 0,
+				totalPrincipalPaid: 0,
+				totalInterestPaid: 0,
+				annualCost: 0,
+			},
+		]
+		return { yearlyData: yearlyDataForZeroPrincipal, monthlyPayment: 0 }
 	}
 
 	const monthlyRate = annualRate / 12 / 100
@@ -99,6 +117,7 @@ function calculateMortgageAmortization(
 			  (Math.pow(1 + monthlyRate, numberOfPayments) - 1)
 
 	if (!isFinite(monthlyPayment)) {
+		console.error('Monthly payment calculation resulted in non-finite number.')
 		return null // Calculation resulted in Infinity or NaN
 	}
 
@@ -108,20 +127,22 @@ function calculateMortgageAmortization(
 	let totalInterestPaid = 0
 
 	for (let year = 1; year <= termYears; year++) {
-		const beginningBalanceYear = balance // Use const as it's not reassigned
+		const beginningBalanceYear = balance
 		let interestPaidYearly = 0
 		let principalPaidYearly = 0
 
 		for (let month = 1; month <= 12; month++) {
 			const currentMonth = (year - 1) * 12 + month
-			if (currentMonth > numberOfPayments || balance <= 0.005) break // Stop if paid off early or term ends (use threshold)
+			// Use a small threshold for floating point comparison
+			if (currentMonth > numberOfPayments || balance <= 0.005) break
 
 			let interestForMonth: number
 			let principalForMonth: number
 
 			if (monthlyRate === 0) {
 				interestForMonth = 0
-				principalForMonth = monthlyPayment
+				// Ensure principal payment doesn't exceed remaining balance or monthly payment
+				principalForMonth = Math.min(balance, monthlyPayment)
 			} else {
 				interestForMonth = balance * monthlyRate
 				principalForMonth = monthlyPayment - interestForMonth
@@ -129,18 +150,18 @@ function calculateMortgageAmortization(
 
 			// Ensure principal payment doesn't exceed remaining balance
 			if (principalForMonth > balance) {
-				interestForMonth = balance * monthlyRate // Recalculate interest based on actual principal paid
-				if (interestForMonth < 0) interestForMonth = 0 // Avoid negative interest
+				// Adjust payment if it overshoots the balance
 				principalForMonth = balance
+				interestForMonth = monthlyRate === 0 ? 0 : balance * monthlyRate // Recalculate interest based on actual principal paid
+				if (interestForMonth < 0) interestForMonth = 0 // Avoid negative interest
 			}
 
 			interestPaidYearly += interestForMonth
 			principalPaidYearly += principalForMonth
 			balance -= principalForMonth
 
-			// Ensure balance doesn't go below zero due to floating point inaccuracies
+			// Ensure balance doesn't go significantly below zero
 			if (balance < 0.005) {
-				// Use a small threshold for floating point comparison
 				balance = 0
 			}
 		}
@@ -148,7 +169,6 @@ function calculateMortgageAmortization(
 		totalPrincipalPaid += principalPaidYearly
 		totalInterestPaid += interestPaidYearly
 
-		// Calculate annual cost
 		const annualCost = principalPaidYearly + interestPaidYearly
 
 		yearlyData.push({
@@ -159,15 +179,87 @@ function calculateMortgageAmortization(
 			endingBalance: balance,
 			totalPrincipalPaid: totalPrincipalPaid,
 			totalInterestPaid: totalInterestPaid,
-			annualCost: annualCost, // Add annual cost
-			// Investment fields will be calculated later
+			annualCost: annualCost,
 		})
 
 		if (balance <= 0) break // Stop if loan is fully paid
 	}
 
-	// Return object with yearlyData and monthlyPayment
 	return { yearlyData, monthlyPayment }
+}
+
+// Helper function to validate scenario inputs
+const validateScenarioInputs = (
+	homePrice: number,
+	downPaymentInput: number,
+	downPaymentType: 'amount' | 'percent',
+	interestRate: number,
+	term: number,
+	existingScenarioNames: string[],
+	newName?: string
+): {
+	isValid: boolean
+	message: string
+	actualDownPayment?: number
+	principal?: number
+	scenarioName?: string
+} => {
+	const scenarioName =
+		newName?.trim() || `Scenario ${existingScenarioNames.length + 1}`
+	if (newName && existingScenarioNames.includes(scenarioName)) {
+		return {
+			isValid: false,
+			message: `Scenario name "${scenarioName}" already exists. Please choose a unique name.`,
+		}
+	}
+
+	const actualDownPayment = getActualDownPayment(
+		homePrice,
+		downPaymentInput,
+		downPaymentType
+	)
+
+	if (
+		downPaymentType === 'percent' &&
+		(downPaymentInput < 0 || downPaymentInput > 100)
+	) {
+		return {
+			isValid: false,
+			message: 'Down payment percentage must be between 0 and 100.',
+		}
+	}
+	if (actualDownPayment < 0) {
+		return { isValid: false, message: 'Down payment cannot be negative.' }
+	}
+	if (actualDownPayment > homePrice) {
+		return {
+			isValid: false,
+			message: 'Down payment cannot be greater than the home price.',
+		}
+	}
+
+	const principal = homePrice - actualDownPayment
+	if (principal === 0 && interestRate !== 0) {
+		return {
+			isValid: false,
+			message:
+				'If down payment covers the full home price (0 principal), the interest rate must be 0.',
+		}
+	}
+	if (interestRate < 0) {
+		return { isValid: false, message: 'Interest rate cannot be negative.' }
+	}
+	if (term <= 0) {
+		return { isValid: false, message: 'Term must be positive.' }
+	}
+
+	return {
+		isValid: true,
+		message: '',
+		actualDownPayment,
+		principal,
+		scenarioName,
+	}
 }
 
 // Helper function to create initial scenarios from config
@@ -178,39 +270,38 @@ const createInitialScenariosFromConfig = (
 	const initialScenarios: Scenario[] = []
 
 	initialScenarioConfigs.forEach((config) => {
-		let actualDownPayment: number
-		if (config.downPaymentType === 'amount') {
-			actualDownPayment = config.downPaymentInput
-		} else {
-			actualDownPayment = homePrice * (config.downPaymentInput / 100)
-		}
+		// Validate inputs *without* checking for name uniqueness against the initial list
+		const validation = validateScenarioInputs(
+			homePrice,
+			config.downPaymentInput,
+			config.downPaymentType,
+			config.interestRate,
+			config.term,
+			[], // Pass an empty array to bypass uniqueness check for initial load
+			config.name // Still pass name to get it back if needed, but uniqueness won't be checked against itself
+		)
 
-		const principal = homePrice - actualDownPayment
-
-		// Basic validation (can be enhanced)
-		if (principal < 0 || config.interestRate < 0 || config.term <= 0) {
+		if (
+			!validation.isValid ||
+			validation.principal === undefined ||
+			validation.actualDownPayment === undefined
+		) {
 			console.error(
-				`Invalid configuration for scenario ${config.name}. Skipping.`
-			)
-			return // Skip this scenario
-		}
-		if (principal === 0 && config.interestRate !== 0) {
-			console.error(
-				`Scenario ${config.name} has 0 principal but non-zero interest. Skipping.`
+				`Invalid configuration for scenario ${config.name}: ${validation.message}. Skipping.`
 			)
 			return // Skip this scenario
 		}
 
 		const calculationResult = calculateMortgageAmortization(
-			principal,
+			validation.principal,
 			config.interestRate,
 			config.term
 		)
 
 		if (calculationResult) {
 			initialScenarios.push({
-				name: config.name,
-				downPayment: actualDownPayment,
+				name: config.name, // Use original config name
+				downPayment: validation.actualDownPayment,
 				downPaymentInput: config.downPaymentInput,
 				downPaymentType: config.downPaymentType,
 				interestRate: config.interestRate,
@@ -228,6 +319,141 @@ const createInitialScenariosFromConfig = (
 	return initialScenarios
 }
 
+// Helper function to calculate yearly updates for a single scenario
+const calculateYearlyScenarioUpdate = (
+	scenario: Scenario,
+	year: number,
+	maxAnnualCost: number,
+	previousCumulativeValue: number,
+	initialInvestmentValue: number,
+	investmentRate: number
+): Partial<YearlyPaymentData> => {
+	const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
+	const dataForPreviousYear = scenario.yearlyData?.find(
+		(d) => d.year === year - 1
+	)
+	const yearlyProfit = previousCumulativeValue * investmentRate
+
+	let investmentAmount = 0
+	let currentCumulativeValue = 0
+	let totalNetWorth = 0
+	let totalPrincipalPaid = dataForPreviousYear?.totalPrincipalPaid ?? 0 // Carry over if ended
+	let totalInterestPaid = dataForPreviousYear?.totalInterestPaid ?? 0 // Carry over if ended
+
+	if (dataForYear && scenario.term >= year) {
+		// Active mortgage year
+		investmentAmount =
+			maxAnnualCost > 0 ? maxAnnualCost - dataForYear.annualCost : 0
+		currentCumulativeValue =
+			previousCumulativeValue * (1 + investmentRate) + investmentAmount
+		totalPrincipalPaid = dataForYear.totalPrincipalPaid
+		totalInterestPaid = dataForYear.totalInterestPaid
+		totalNetWorth =
+			scenario.downPayment + totalPrincipalPaid + currentCumulativeValue
+	} else {
+		// Scenario ended or data missing for the year (treat as ended)
+		investmentAmount = 0 // No mortgage cost difference to invest
+		currentCumulativeValue = previousCumulativeValue * (1 + investmentRate)
+		// Use the last known principal paid if the scenario ended previously
+		const lastData = scenario.yearlyData?.[scenario.yearlyData.length - 1]
+		totalPrincipalPaid = lastData?.totalPrincipalPaid ?? totalPrincipalPaid // Use last known if available
+		totalInterestPaid = lastData?.totalInterestPaid ?? totalInterestPaid // Use last known if available
+		totalNetWorth =
+			scenario.downPayment + totalPrincipalPaid + currentCumulativeValue
+	}
+
+	// Calculate Year-over-Year Change ($)
+	let prevNetWorth: number
+	if (year === 1) {
+		prevNetWorth = scenario.downPayment + initialInvestmentValue
+	} else {
+		prevNetWorth = dataForPreviousYear?.totalNetWorth ?? 0
+	}
+	const netWorthDifference = totalNetWorth - prevNetWorth
+
+	return {
+		investmentDifference: investmentAmount,
+		cumulativeInvestmentValue: currentCumulativeValue,
+		investmentProfitYearly: yearlyProfit,
+		totalNetWorth: totalNetWorth,
+		netWorthDifference: isFinite(netWorthDifference) ? netWorthDifference : 0,
+		// Ensure these are carried over correctly for placeholder data
+		totalPrincipalPaid: totalPrincipalPaid,
+		totalInterestPaid: totalInterestPaid,
+	}
+}
+
+// Helper function to ensure yearly data exists up to maxYears
+const ensureYearlyDataExists = (
+	scenario: Scenario,
+	year: number,
+	calculatedUpdate: Partial<YearlyPaymentData>
+) => {
+	let dataForYear = scenario.yearlyData?.find((d) => d.year === year)
+	if (!dataForYear) {
+		if (!scenario.yearlyData) scenario.yearlyData = []
+		// Create placeholder if it doesn't exist (scenario ended)
+		dataForYear = {
+			year: year,
+			beginningBalance: 0,
+			interestPaidYearly: 0,
+			principalPaidYearly: 0,
+			endingBalance: 0,
+			annualCost: 0,
+			// Populate from calculated update or defaults
+			totalPrincipalPaid: calculatedUpdate.totalPrincipalPaid ?? 0,
+			totalInterestPaid: calculatedUpdate.totalInterestPaid ?? 0,
+			investmentDifference: calculatedUpdate.investmentDifference ?? 0,
+			cumulativeInvestmentValue:
+				calculatedUpdate.cumulativeInvestmentValue ?? 0,
+			investmentProfitYearly: calculatedUpdate.investmentProfitYearly ?? 0,
+			totalNetWorth: calculatedUpdate.totalNetWorth ?? 0,
+			netWorthDifference: calculatedUpdate.netWorthDifference ?? 0,
+		}
+		scenario.yearlyData.push(dataForYear)
+	} else {
+		// Update existing data entry
+		Object.assign(dataForYear, calculatedUpdate)
+	}
+	return dataForYear
+}
+
+// Helper function to calculate performance percentage for a given year
+const calculatePerformancePercentage = (
+	processedScenarios: Scenario[],
+	year: number,
+	maxNetWorthThisYear: number
+) => {
+	if (!isFinite(maxNetWorthThisYear) || maxNetWorthThisYear === -Infinity) {
+		processedScenarios.forEach((scenario) => {
+			const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
+			if (dataForYear) dataForYear.performancePercentage = 0
+		})
+		return
+	}
+
+	processedScenarios.forEach((scenario) => {
+		const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
+		if (dataForYear && dataForYear.totalNetWorth !== undefined) {
+			const denominator = Math.abs(maxNetWorthThisYear)
+			const performance =
+				denominator === 0
+					? dataForYear.totalNetWorth === 0
+						? 0
+						: Infinity // Or handle as appropriate if max is 0 but current isn't
+					: ((dataForYear.totalNetWorth - maxNetWorthThisYear) / denominator) *
+					  100
+			dataForYear.performancePercentage = isFinite(performance)
+				? performance
+				: performance > 0
+				? 100 // Cap positive infinity
+				: -100 // Cap negative infinity
+		} else if (dataForYear) {
+			dataForYear.performancePercentage = 0 // Default if net worth is missing
+		}
+	})
+}
+
 function App() {
 	// State to hold the loaded config data
 	const [configData, setConfigData] = useState<ConfigData | null>(null)
@@ -236,7 +462,7 @@ function App() {
 
 	// Fetch and parse the YAML config file on component mount
 	useEffect(() => {
-		fetch('/src/config.yaml') // Fetch from the public path Vite serves
+		fetch('/config.yaml') // Fetch from the public root
 			.then((response) => {
 				if (!response.ok) {
 					throw new Error(`HTTP error! status: ${response.status}`)
@@ -283,14 +509,14 @@ function App() {
 	// Effect to update state once config is loaded
 	useEffect(() => {
 		if (configData) {
+			// Only run if configData is not null
 			setHomePrice(configData.homePrice)
 			setInitialInvestments(configData.initialInvestments)
-			setScenarios(
-				createInitialScenariosFromConfig(
-					configData.homePrice,
-					configData.initialScenarios
-				)
+			const initialScenarios = createInitialScenariosFromConfig(
+				configData.homePrice,
+				configData.initialScenarios
 			)
+			setScenarios(initialScenarios)
 		}
 	}, [configData]) // Re-run when configData changes
 
@@ -309,59 +535,28 @@ function App() {
 	const INVESTMENT_RATE = 0.07 // 7% annual growth
 
 	const addScenario = () => {
-		// Use index or a generated name if empty
-		const scenarioName =
-			newScenarioName.trim() || `Scenario ${scenarios.length + 1}`
-		// Check if name already exists
-		if (scenarios.some((s) => s.name === scenarioName)) {
-			alert(
-				`Scenario name "${scenarioName}" already exists. Please choose a unique name.`
-			)
-			return
-		}
+		const validation = validateScenarioInputs(
+			homePrice,
+			newDownPaymentValue,
+			newDownPaymentType,
+			newInterestRate,
+			newTerm,
+			scenarios.map((s) => s.name), // Pass current scenario names
+			newScenarioName // Pass the potential new name
+		)
 
-		let actualDownPayment: number
-		if (newDownPaymentType === 'amount') {
-			actualDownPayment = newDownPaymentValue
-		} else {
-			if (newDownPaymentValue < 0 || newDownPaymentValue > 100) {
-				alert('Down payment percentage must be between 0 and 100.')
-				return
-			}
-			actualDownPayment = homePrice * (newDownPaymentValue / 100)
-		}
-
-		if (actualDownPayment < 0) {
-			alert('Down payment cannot be negative.')
-			return
-		}
-		if (actualDownPayment > homePrice) {
-			alert('Down payment cannot be greater than the home price.')
-			return
-		}
-
-		const principal = homePrice - actualDownPayment
-		if (principal < 0) {
-			alert('Calculated loan principal is negative.')
-			return
-		}
-		if (principal === 0 && newInterestRate !== 0) {
-			alert(
-				'If down payment covers the full home price (0 principal), the interest rate must be 0.'
-			)
-			return
-		}
-		if (newInterestRate < 0) {
-			alert('Interest rate cannot be negative.')
-			return
-		}
-		if (newTerm <= 0) {
-			alert('Term must be positive.')
+		if (
+			!validation.isValid ||
+			validation.principal === undefined ||
+			validation.actualDownPayment === undefined ||
+			validation.scenarioName === undefined
+		) {
+			alert(validation.message)
 			return
 		}
 
 		const calculationResult = calculateMortgageAmortization(
-			principal,
+			validation.principal,
 			newInterestRate,
 			newTerm
 		)
@@ -374,8 +569,8 @@ function App() {
 		}
 
 		const newScenario: Scenario = {
-			name: scenarioName,
-			downPayment: actualDownPayment,
+			name: validation.scenarioName, // Use validated/generated name
+			downPayment: validation.actualDownPayment,
 			downPaymentInput: newDownPaymentValue,
 			downPaymentType: newDownPaymentType,
 			interestRate: newInterestRate,
@@ -392,7 +587,6 @@ function App() {
 		setNewDownPaymentValue(20)
 		setNewInterestRate(4.19)
 		setNewTerm(30)
-		// Removed rental input resets
 	}
 
 	const removeScenario = (indexToRemove: number) => {
@@ -424,18 +618,7 @@ function App() {
 		}).format(value)
 	}
 
-	// Helper function to format percentage
-	// const formatPercentage = (value: number | undefined) => { // Comment out unused function for now
-	// 	if (value === undefined || !isFinite(value)) {
-	// 		return 'N/A'
-	// 	}
-	// 	// Add check for exactly 0
-	// 	if (value === 0) {
-	// 		return '-'
-	// 	}
-	// 	const formatted = value.toFixed(2)
-	// 	return value > 0 ? `+${formatted}%` : `${formatted}%`
-	// }
+	// Removed formatPercentage function
 
 	const handleDownPaymentTypeChange = (
 		event: React.ChangeEvent<HTMLInputElement>
@@ -452,32 +635,27 @@ function App() {
 		}
 	}
 
-	// Calculate investment growth data using useMemo (Simplified Logic)
+	// Calculate investment growth data using useMemo (Refactored Logic)
 	const scenariosWithInvestment = useMemo(() => {
-		if (!configData || scenarios.length < 1) return [] // Guard against running before config is loaded
+		if (!configData || scenarios.length < 1) return []
 
 		const processedScenarios = JSON.parse(
 			JSON.stringify(scenarios)
 		) as Scenario[]
 
-		// Store the initial investment amount for each scenario using index or name as key
-		const initialInvestmentValues: { [scenarioName: string]: number } = {} // Use name as key
+		const initialInvestmentValues: { [scenarioName: string]: number } = {}
 		processedScenarios.forEach((scenario) => {
-			// Simplified initial investment calculation (mortgage only)
 			initialInvestmentValues[scenario.name] = Math.max(
-				// Use name as key
 				0,
 				initialInvestments - scenario.downPayment
 			)
 		})
 
 		const currentCumulativeValues = { ...initialInvestmentValues }
-
-		// Use simplified maxYears
 		const calculationMaxYears = maxYears
 
 		for (let year = 1; year <= calculationMaxYears; year++) {
-			// --- Step 1: Find Max Annual Cost for the current year (mortgage only) ---
+			// --- Step 1: Find Max Annual Cost for the current year ---
 			let maxAnnualCost = 0
 			processedScenarios.forEach((scenario) => {
 				const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
@@ -488,153 +666,53 @@ function App() {
 
 			let maxNetWorthThisYear = -Infinity
 
-			// --- Step 2: Calculate Investment, Net Worth for each scenario (mortgage only) ---
+			// --- Step 2: Calculate Investment, Net Worth for each scenario ---
 			processedScenarios.forEach((scenario) => {
-				const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
-				// Use scenario.name as the key
 				const previousCumulativeValue =
 					currentCumulativeValues[scenario.name] || 0
-				const dataForPreviousYear = scenario.yearlyData?.find(
-					(d) => d.year === year - 1
+				const initialInvestment = initialInvestmentValues[scenario.name] || 0
+
+				const calculatedUpdate = calculateYearlyScenarioUpdate(
+					scenario,
+					year,
+					maxAnnualCost,
+					previousCumulativeValue,
+					initialInvestment,
+					INVESTMENT_RATE
 				)
-				const yearlyProfit = previousCumulativeValue * INVESTMENT_RATE
 
-				// --- Handle scenarios that ended previously --- (Simplified)
-				if (!dataForYear && scenario.term < year) {
-					const lastData = scenario.yearlyData?.[scenario.yearlyData.length - 1]
-					const lastTotalPrincipalPaid = lastData?.totalPrincipalPaid || 0
+				// Ensure data exists and update it
+				const updatedDataForYear = ensureYearlyDataExists(
+					scenario,
+					year,
+					calculatedUpdate
+				)
 
-					const currentCumulativeValue =
-						previousCumulativeValue * (1 + INVESTMENT_RATE)
-					currentCumulativeValues[scenario.name] = currentCumulativeValue
+				// Update cumulative value for the next iteration
+				if (updatedDataForYear.cumulativeInvestmentValue !== undefined) {
+					currentCumulativeValues[scenario.name] =
+						updatedDataForYear.cumulativeInvestmentValue
+				}
 
-					// Simplified Net Worth Calculation (mortgage only)
-					const netWorthForEndedYear =
-						scenario.downPayment +
-						lastTotalPrincipalPaid +
-						currentCumulativeValue
-
-					// Ensure placeholder data exists
-					let placeholderData = scenario.yearlyData?.find(
-						(d) => d.year === year
-					)
-					if (!placeholderData) {
-						if (!scenario.yearlyData) scenario.yearlyData = []
-						placeholderData = {
-							year: year,
-							beginningBalance: 0,
-							interestPaidYearly: 0,
-							principalPaidYearly: 0,
-							endingBalance: 0,
-							totalPrincipalPaid: lastTotalPrincipalPaid,
-							totalInterestPaid: lastData?.totalInterestPaid || 0,
-							annualCost: 0,
-							investmentDifference: 0,
-							cumulativeInvestmentValue: 0,
-							investmentProfitYearly: 0,
-							totalNetWorth: 0,
-						}
-						scenario.yearlyData.push(placeholderData)
-					}
-					// Populate placeholder data
-					placeholderData.investmentDifference = 0
-					placeholderData.cumulativeInvestmentValue = currentCumulativeValue
-					placeholderData.investmentProfitYearly = yearlyProfit
-					placeholderData.totalNetWorth = netWorthForEndedYear
-					placeholderData.totalPrincipalPaid = lastTotalPrincipalPaid
-
-					// Calculate Year-over-Year Change ($) (Simplified base case)
-					let prevNetWorth: number
-					if (year === 1) {
-						prevNetWorth =
-							scenario.downPayment + initialInvestmentValues[scenario.name]
-					} else {
-						prevNetWorth = dataForPreviousYear?.totalNetWorth ?? 0
-					}
-					const difference = netWorthForEndedYear - prevNetWorth
-					placeholderData.netWorthDifference = isFinite(difference)
-						? difference
-						: 0
-
+				// Track max net worth for performance calculation
+				if (updatedDataForYear.totalNetWorth !== undefined) {
 					maxNetWorthThisYear = Math.max(
 						maxNetWorthThisYear,
-						netWorthForEndedYear
-					)
-
-					// --- Handle active scenarios --- (Simplified)
-				} else if (dataForYear) {
-					const investmentAmount =
-						scenario.term >= year && maxAnnualCost > 0
-							? maxAnnualCost - dataForYear.annualCost
-							: 0
-
-					const currentCumulativeValue =
-						previousCumulativeValue * (1 + INVESTMENT_RATE) + investmentAmount
-					currentCumulativeValues[scenario.name] = currentCumulativeValue
-
-					dataForYear.investmentDifference = investmentAmount
-					dataForYear.cumulativeInvestmentValue = currentCumulativeValue
-					dataForYear.investmentProfitYearly = yearlyProfit
-
-					// Simplified Net Worth Calculation (mortgage only)
-					dataForYear.totalNetWorth =
-						scenario.downPayment +
-						dataForYear.totalPrincipalPaid +
-						currentCumulativeValue
-
-					// Calculate Year-over-Year Change ($) (Simplified base case)
-					let prevNetWorth: number
-					if (year === 1) {
-						prevNetWorth =
-							scenario.downPayment + initialInvestmentValues[scenario.name]
-					} else {
-						prevNetWorth = dataForPreviousYear?.totalNetWorth ?? 0
-					}
-					const difference = dataForYear.totalNetWorth - prevNetWorth
-					dataForYear.netWorthDifference = isFinite(difference) ? difference : 0
-
-					maxNetWorthThisYear = Math.max(
-						maxNetWorthThisYear,
-						dataForYear.totalNetWorth
+						updatedDataForYear.totalNetWorth
 					)
 				}
 			})
 
-			// --- Step 3: Calculate Performance Percentage (no changes needed here) ---
-			if (isFinite(maxNetWorthThisYear) && maxNetWorthThisYear !== -Infinity) {
-				processedScenarios.forEach((scenario) => {
-					const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
-					if (dataForYear && dataForYear.totalNetWorth !== undefined) {
-						const denominator = Math.abs(maxNetWorthThisYear)
-						const performance =
-							denominator === 0
-								? dataForYear.totalNetWorth === 0
-									? 0
-									: Infinity
-								: ((dataForYear.totalNetWorth - maxNetWorthThisYear) /
-										denominator) *
-								  100
-						dataForYear.performancePercentage = isFinite(performance)
-							? performance
-							: performance > 0
-							? 100
-							: -100
-					} else if (dataForYear) {
-						dataForYear.performancePercentage = 0
-					}
-				})
-			} else {
-				processedScenarios.forEach((scenario) => {
-					const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
-					if (dataForYear) {
-						dataForYear.performancePercentage = 0
-					}
-				})
-			}
+			// --- Step 3: Calculate Performance Percentage ---
+			calculatePerformancePercentage(
+				processedScenarios,
+				year,
+				maxNetWorthThisYear
+			)
 		}
 
 		return processedScenarios
-	}, [scenarios, initialInvestments, configData, maxYears]) // Add configData and maxYears as dependencies
+	}, [scenarios, initialInvestments, configData, maxYears, INVESTMENT_RATE]) // Added INVESTMENT_RATE
 
 	// Define an interface for the chart data points
 	interface ChartDataPoint {
@@ -643,33 +721,71 @@ function App() {
 		[key: string]: number | string | null // Allow dynamic keys holding numbers or null
 	}
 
-	// --- Prepare data for the chart ---
-	const chartData = useMemo(() => {
-		if (scenariosWithInvestment.length === 0) return []
+	// Define metrics to display on the chart
+	const CHART_METRICS: {
+		key: keyof YearlyPaymentData
+		name: string
+		style: 'solid' | 'dashed' | 'dotted' | 'dash-dot' | 'short-dash'
+	}[] = [
+		{ key: 'totalNetWorth', name: 'Net Worth', style: 'solid' },
+		{ key: 'totalPrincipalPaid', name: 'Principal Paid', style: 'dashed' },
+		{ key: 'totalInterestPaid', name: 'Interest Paid', style: 'dotted' },
+		{
+			key: 'cumulativeInvestmentValue',
+			name: 'Investment Value',
+			style: 'dash-dot',
+		},
+		{ key: 'endingBalance', name: 'Ending Balance', style: 'short-dash' },
+	]
 
-		const data: ChartDataPoint[] = [] // Use the defined interface
+	// Helper function to get dash style for chart lines
+	const getStrokeDashArray = (
+		style: 'solid' | 'dashed' | 'dotted' | 'dash-dot' | 'short-dash'
+	): string | undefined => {
+		switch (style) {
+			case 'solid':
+				return undefined
+			case 'dashed':
+				return '5 5'
+			case 'dotted':
+				return '1 3'
+			case 'dash-dot':
+				return '10 5 2 5'
+			case 'short-dash':
+				return '3 3'
+			default:
+				return undefined
+		}
+	}
+
+	// Helper function to prepare data for the chart
+	const prepareChartData = (
+		scenarios: Scenario[],
+		maxYears: number
+	): ChartDataPoint[] => {
+		if (scenarios.length === 0) return []
+
+		const data: ChartDataPoint[] = []
 
 		for (let year = 1; year <= maxYears; year++) {
-			const yearData: ChartDataPoint = { year: `Year ${year}` } // Use string for XAxis label
+			const yearData: ChartDataPoint = { year: `Year ${year}` }
 
-			scenariosWithInvestment.forEach((scenario) => {
+			scenarios.forEach((scenario) => {
 				const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
-				// Add data for each metric, prefixing with scenario name
-				yearData[`${scenario.name}_totalNetWorth`] =
-					dataForYear?.totalNetWorth ?? null
-				yearData[`${scenario.name}_totalPrincipalPaid`] =
-					dataForYear?.totalPrincipalPaid ?? null
-				yearData[`${scenario.name}_totalInterestPaid`] =
-					dataForYear?.totalInterestPaid ?? null
-				yearData[`${scenario.name}_cumulativeInvestmentValue`] =
-					dataForYear?.cumulativeInvestmentValue ?? null
-				yearData[`${scenario.name}_endingBalance`] =
-					dataForYear?.endingBalance ?? null
+				CHART_METRICS.forEach((metric) => {
+					yearData[`${scenario.name}_${metric.key}`] =
+						dataForYear?.[metric.key] ?? null
+				})
 			})
 			data.push(yearData)
 		}
 		return data
-	}, [scenariosWithInvestment, maxYears]) // Keep chartData definition
+	}
+
+	// --- Prepare data for the chart ---
+	const chartData = useMemo(() => {
+		return prepareChartData(scenariosWithInvestment, maxYears)
+	}, [scenariosWithInvestment, maxYears]) // Simplified dependencies
 
 	// Define colors for the chart lines
 	const chartColors = useMemo(() => {
@@ -741,92 +857,23 @@ function App() {
 			</div>
 			<hr />
 			{/* --- Add New Scenario Form --- (Simplified) */}
-			<h2>Add New Scenario</h2>
-			{/* Removed Scenario Type Selection */}
-			{/* Wrap form inputs in a div for styling */}
-			<div className="add-scenario-form">
-				{/* Scenario Name Input */}
-				<div>
-					<label>
-						Scenario Name (Optional):
-						<input
-							type="text"
-							value={newScenarioName}
-							onChange={(e) => setNewScenarioName(e.target.value)}
-							placeholder={`e.g., Scenario ${scenarios.length + 1}`} // Updated placeholder
-							style={{ width: '200px', marginLeft: '5px' }}
-						/>
-					</label>
-				</div>
-
-				{/* Mortgage Inputs Only */}
-				<div>
-					<label style={{ marginRight: '10px' }}>Down Payment Type:</label>
-					<label style={{ marginRight: '10px', display: 'inline-block' }}>
-						<input
-							type="radio"
-							value="amount"
-							checked={newDownPaymentType === 'amount'}
-							onChange={handleDownPaymentTypeChange}
-							style={{ marginRight: '5px' }} // Added margin
-						/>
-						Amount ($)
-					</label>
-					<label style={{ display: 'inline-block' }}>
-						<input
-							type="radio"
-							value="percent"
-							checked={newDownPaymentType === 'percent'}
-							onChange={handleDownPaymentTypeChange}
-							style={{ marginRight: '5px' }} // Added margin
-						/>
-						Percent (%)
-					</label>
-				</div>
-				<div>
-					<label>
-						Down Payment ({newDownPaymentType === 'amount' ? '$' : '%'}):
-						<input
-							type="number"
-							value={newDownPaymentValue}
-							onChange={(e) => setNewDownPaymentValue(Number(e.target.value))}
-							min="0"
-							step={newDownPaymentType === 'percent' ? '0.1' : '1'}
-						/>
-						{newDownPaymentType === 'percent' && (
-							<span style={{ marginLeft: '10px', color: '#555' }}>
-								({formatCurrency(homePrice * (newDownPaymentValue / 100))})
-							</span>
-						)}
-					</label>
-				</div>
-				<div>
-					<label>
-						Interest Rate:{' '}
-						<input
-							type="number"
-							value={newInterestRate}
-							onChange={(e) => setNewInterestRate(Number(e.target.value))}
-							step="0.01"
-							min="0"
-						/>
-					</label>
-				</div>
-				<div>
-					<label>
-						Term:{' '}
-						<input
-							type="number"
-							value={newTerm}
-							onChange={(e) => setNewTerm(Number(e.target.value))}
-							min="1"
-						/>
-					</label>
-				</div>
-			</div>{' '}
-			{/* End of add-scenario-form wrapper */}
-			{/* Removed Conditional Inputs and Rental Inputs */}
-			<button onClick={addScenario}>Add Scenario</button>
+			<AddScenarioForm
+				homePrice={homePrice}
+				scenariosCount={scenarios.length}
+				newScenarioName={newScenarioName}
+				setNewScenarioName={setNewScenarioName}
+				newDownPaymentType={newDownPaymentType}
+				setNewDownPaymentType={setNewDownPaymentType} // Pass setter for handler
+				newDownPaymentValue={newDownPaymentValue}
+				setNewDownPaymentValue={setNewDownPaymentValue}
+				newInterestRate={newInterestRate}
+				setNewInterestRate={setNewInterestRate}
+				newTerm={newTerm}
+				setNewTerm={setNewTerm}
+				onAddScenario={addScenario}
+				formatCurrency={formatCurrency}
+				handleDownPaymentTypeChange={handleDownPaymentTypeChange}
+			/>
 			<hr />
 			{/* --- Scenario Summaries --- (Simplified) */}
 			<h2>Current Scenarios</h2>
@@ -834,33 +881,14 @@ function App() {
 				<p>No scenarios added yet.</p>
 			) : (
 				<div className="scenario-summaries">
-					{/* Use index for key and remove function */}
 					{scenarios.map((scenario, index) => (
-						<div
+						<ScenarioSummaryCard
 							key={`${scenario.name}-${index}`}
-							className="scenario-summary-card"
-						>
-							<h3>{scenario.name}</h3> {/* Removed type indicator */}
-							{/* Simplified to only show mortgage details */}
-							<p>
-								Down Payment: {formatCurrency(scenario.downPayment)} (
-								{scenario.downPaymentType === 'percent'
-									? `${scenario.downPaymentInput}%`
-									: formatCurrency(scenario.downPaymentInput)}
-								)
-							</p>
-							<p>Interest Rate: {scenario.interestRate}%</p>
-							<p>Term: {scenario.term} Years</p>
-							<p>Monthly P&I: {formatCurrency(scenario.monthlyPayment)}</p>
-							{/* Removed rental details block */}
-							<button
-								onClick={() => removeScenario(index)}
-								className="remove-button-small"
-								style={{ marginTop: '5px' }}
-							>
-								Remove
-							</button>
-						</div>
+							scenario={scenario}
+							index={index}
+							onRemove={removeScenario}
+							formatCurrency={formatCurrency}
+						/>
 					))}
 				</div>
 			)}
@@ -890,22 +918,26 @@ function App() {
 									_dataKey: string, // The internal key like "Scenario A_totalNetWorth"
 									props // Contains payload, name, color etc.
 								) => {
-									const displayName = props.name; // Use the name prop from <Line> ("Scenario A - Net Worth")
+									const displayName = props.name // Use the name prop from <Line> ("Scenario A - Net Worth")
 
 									// Format the value as currency
-									let formattedValue: string;
+									let formattedValue: string
 									if (Array.isArray(value)) {
 										// Handle potential arrays (less likely for Line chart values)
-										formattedValue = value.map(v => typeof v === 'number' ? formatCurrency(v) : String(v)).join(', ');
+										formattedValue = value
+											.map((v) =>
+												typeof v === 'number' ? formatCurrency(v) : String(v)
+											)
+											.join(', ')
 									} else if (typeof value === 'number') {
-										formattedValue = formatCurrency(value);
+										formattedValue = formatCurrency(value)
 									} else {
 										// Handle string or null
-										formattedValue = value !== null ? String(value) : 'N/A';
+										formattedValue = value !== null ? String(value) : 'N/A'
 									}
 
 									// Return the formatted value and the display name from the Line's name prop
-									return [formattedValue, displayName];
+									return [formattedValue, displayName]
 								}}
 								// Custom label formatter to show scenario name clearly
 								labelFormatter={(label) =>
@@ -931,68 +963,20 @@ function App() {
 							<Legend />
 							{/* Map scenarios and metrics to Line components using flatMap */}
 							{scenariosWithInvestment.flatMap((scenario) =>
-								// Return an array of all Line components for this scenario
-								[
-									// Total Net Worth (Solid)
+								// Map over defined metrics for each scenario
+								CHART_METRICS.map((metric) => (
 									<Line
-										key={`${scenario.name}_totalNetWorth`}
+										key={`${scenario.name}_${metric.key}`}
 										type="monotone"
-										dataKey={`${scenario.name}_totalNetWorth`}
-										name={`${scenario.name} - Net Worth`}
+										dataKey={`${scenario.name}_${metric.key}`}
+										name={`${scenario.name} - ${metric.name}`}
 										stroke={chartColors[scenario.name]}
+										strokeDasharray={getStrokeDashArray(metric.style)}
 										activeDot={{ r: 6 }}
 										connectNulls
 										// dot={false} // Keep commented for now
-									/>,
-									// Total Principal Paid (Dashed)
-									<Line
-										key={`${scenario.name}_totalPrincipalPaid`}
-										type="monotone"
-										dataKey={`${scenario.name}_totalPrincipalPaid`}
-										name={`${scenario.name} - Principal Paid`}
-										stroke={chartColors[scenario.name]}
-										strokeDasharray="5 5"
-										activeDot={{ r: 6 }}
-										connectNulls
-										// dot={false} // Keep commented for now
-									/>,
-									// Total Interest Paid (Dotted)
-									<Line
-										key={`${scenario.name}_totalInterestPaid`}
-										type="monotone"
-										dataKey={`${scenario.name}_totalInterestPaid`}
-										name={`${scenario.name} - Interest Paid`}
-										stroke={chartColors[scenario.name]}
-										strokeDasharray="1 3"
-										activeDot={{ r: 6 }}
-										connectNulls
-										// dot={false} // Keep commented for now
-									/>,
-									// Cumulative Investment Value (Dash-Dot)
-									<Line
-										key={`${scenario.name}_cumulativeInvestmentValue`}
-										type="monotone"
-										dataKey={`${scenario.name}_cumulativeInvestmentValue`}
-										name={`${scenario.name} - Investment Value`}
-										stroke={chartColors[scenario.name]}
-										strokeDasharray="10 5 2 5"
-										activeDot={{ r: 6 }}
-										connectNulls
-										// dot={false} // Keep commented for now
-									/>,
-									// Ending Balance (Short Dashes)
-									<Line
-										key={`${scenario.name}_endingBalance`}
-										type="monotone"
-										dataKey={`${scenario.name}_endingBalance`}
-										name={`${scenario.name} - Ending Balance`}
-										stroke={chartColors[scenario.name]}
-										strokeDasharray="3 3"
-										activeDot={{ r: 6 }}
-										connectNulls
-										// dot={false} // Keep commented for now
-									/>,
-								]
+									/>
+								))
 							)}
 						</LineChart>
 					</ResponsiveContainer>
@@ -1039,118 +1023,23 @@ function App() {
 												(d: YearlyPaymentData) => d.year === year
 											)
 											const isActiveMortgageYear = scenario.term >= year
+											const isFirstScenarioOfYear = scenarioIndex === 0
 											const isLastScenarioOfYear =
 												scenarioIndex === scenariosWithInvestment.length - 1
-											const rowKey = `${scenario.name}-${year}-${scenarioIndex}`
-											const missingRowKey = `${scenario.name}-${year}-missing-${scenarioIndex}`
 
-											return dataForYear ? (
-												<tr
-													key={rowKey}
-													// Apply alternating row class
-													className={`${
-														scenarioIndex % 2 === 0
-															? 'scenario-even'
-															: 'scenario-odd'
-													} ${isLastScenarioOfYear ? 'year-separator' : ''}`}
-													style={!isActiveMortgageYear ? { color: '#999' } : {}}
-												>
-													{/* Apply sticky and alignment classes to cells */}
-													{scenarioIndex === 0 ? (
-														<td
-															rowSpan={scenariosWithInvestment.length}
-															className="sticky-col sticky-col-1 text-center"
-														>
-															{year}
-														</td>
-													) : null}
-													<td className="sticky-col sticky-col-2 text-left">
-														{scenario.name}{' '}
-														{!isActiveMortgageYear ? '(Ended)' : ''}
-													</td>
-													<td className="sticky-col sticky-col-3 text-right">
-														{isActiveMortgageYear
-															? formatCurrency(dataForYear.beginningBalance)
-															: '-'}
-													</td>
-													{/* Remaining cells default to text-right from CSS */}
-													<td className="text-right"> {/* Add className here */}
-														{isActiveMortgageYear
-															? formatCurrency(dataForYear.principalPaidYearly)
-															: '-'}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{isActiveMortgageYear
-															? formatCurrency(dataForYear.interestPaidYearly)
-															: '-'}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{isActiveMortgageYear
-															? formatCurrency(dataForYear.annualCost)
-															: '-'}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{isActiveMortgageYear
-															? formatCurrency(dataForYear.endingBalance)
-															: '-'}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{formatCurrency(dataForYear.totalInterestPaid)}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{isActiveMortgageYear &&
-														dataForYear.investmentDifference !== 0
-															? formatCurrency(dataForYear.investmentDifference)
-															: '-'}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{formatCurrency(dataForYear.totalPrincipalPaid)}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{formatCurrency(dataForYear.investmentProfitYearly)}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{formatCurrency(
-															dataForYear.cumulativeInvestmentValue
-														)}
-													</td>
-													<td className="text-right">{formatCurrency(dataForYear.totalNetWorth)}</td> {/* Add className here */}
-													<td className="text-right"> {/* Add className here */}
-														{formatCurrency(dataForYear.netWorthDifference)}
-													</td>
-													<td className="text-right"> {/* Add className here */}
-														{/* Display '-' if performance is exactly 0, otherwise format */}
-														{dataForYear.performancePercentage === 0
-															? '-'
-															: `${dataForYear.performancePercentage?.toFixed(
-																	2
-															  )}%`}
-													</td>
-												</tr>
-											) : (
-												<tr
-													key={missingRowKey}
-													className={
-														isLastScenarioOfYear ? 'year-separator' : ''
-													}
-												>
-													{/* Apply sticky and alignment classes to missing data row cells */}
-													{scenarioIndex === 0 ? (
-														<td
-															rowSpan={scenariosWithInvestment.length}
-															className="sticky-col sticky-col-1 text-center"
-														>
-															{year}
-														</td>
-													) : null}
-													<td className="sticky-col sticky-col-2 text-left">
-														{scenario.name} (Data Missing/Error)
-													</td>
-													{/* Make sure colSpan accounts for the sticky columns */}
-													<td colSpan={13} className="text-left">
-														Data missing or error for this year
-													</td>
-												</tr>
+											return (
+												<ScenarioTableRow
+													key={`${scenario.name}-${year}-${scenarioIndex}`}
+													year={year}
+													scenario={scenario}
+													dataForYear={dataForYear}
+													isFirstScenarioOfYear={isFirstScenarioOfYear}
+													isLastScenarioOfYear={isLastScenarioOfYear}
+													isActiveMortgageYear={isActiveMortgageYear}
+													rowIndex={scenarioIndex}
+													totalScenariosInYear={scenariosWithInvestment.length}
+													formatCurrency={formatCurrency}
+												/>
 											)
 										}
 									)}

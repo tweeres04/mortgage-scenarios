@@ -1,0 +1,13 @@
+homePrice: 700000
+initialInvestments: 300000
+initialScenarios:
+  - name: "20% Down"
+    downPaymentInput: 20
+    downPaymentType: "percent"
+    interestRate: 4.19
+    term: 30
+  - name: "5% Down"
+    downPaymentInput: 5
+    downPaymentType: "percent"
+    interestRate: 3.9
+    term: 25

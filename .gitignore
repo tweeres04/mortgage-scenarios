@@ -13,7 +13,7 @@ dist-ssr
 *.local
 
 # Configuration file
-src/config.yaml
+/public/config.yaml
 
 # Editor directories and files
 .vscode/*

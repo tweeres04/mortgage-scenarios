@@ -1,0 +1,332 @@
+/* Add some basic styling */
+.App {
+	/* font-family: sans-serif; */ /* Removed to inherit Poppins */
+	padding: 20px;
+	max-width: 1400px; /* Increased max width for wider table */
+	margin: 0 auto; /* Center the app */
+}
+
+label {
+	/* display: block; */ /* Keep labels inline where appropriate */
+	/* margin-bottom: 10px; */ /* Removed, handled by form container */
+	/* margin-right: 5px; */ /* Removed, handled by gap or specific spacing */
+	display: inline-flex; /* Use flexbox for alignment */
+	align-items: center; /* Vertically center items */
+	gap: 4px; /* Space between radio/checkbox and text */
+	margin-right: 10px; /* Space between label groups */
+}
+
+/* Allow inline display for radio button groups */
+/* label[style*='inline-block'] { */ /* Removed, handled by inline-flex */
+/* 	display: inline-block !important; */
+/* 	margin-right: 15px; */ /* Space between radio options */
+/* } */
+
+input[type='number'] {
+	margin-left: 5px;
+	padding: 5px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	width: 100px; /* Give inputs a consistent width */
+}
+
+/* Style for text input */
+input[type='text'] {
+	margin-left: 5px;
+	padding: 5px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	/* width: 150px; */ /* Example width, adjust as needed */
+}
+
+/* Style for radio buttons */
+input[type='radio'] {
+	appearance: none; /* Hide default appearance */
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	width: 16px; /* Set a size */
+	height: 16px;
+	border: 2px solid #b8860b; /* Darker gold border */
+	border-radius: 50%; /* Make it circular */
+	background-color: white; /* Default background */
+	position: relative; /* For positioning the inner dot AND vertical adjustment */
+	top: 2px; /* Nudge down slightly to better align with text */
+	cursor: pointer;
+	outline: none; /* Remove default focus outline */
+	/* vertical-align: middle; */ /* No longer needed with flex */
+	margin-left: 0; /* Reset margin, gap handles spacing */
+	margin-right: 0; /* Reset margin, gap handles spacing */
+	flex-shrink: 0; /* Prevent shrinking if label text is long */
+}
+
+/* Style the inner dot when checked */
+input[type='radio']:checked::before {
+	content: '';
+	display: block;
+	width: 8px; /* Size of the inner dot */
+	height: 8px;
+	border-radius: 50%;
+	background-color: #daa520; /* Goldenrod color */
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%); /* Center the dot */
+}
+
+/* Optional: Style on hover */
+input[type='radio']:hover {
+	border-color: #daa520; /* Lighter gold on hover */
+}
+
+/* Optional: Style on focus */
+input[type='radio']:focus {
+	box-shadow: 0 0 0 2px rgba(218, 165, 32, 0.4); /* Goldenrod focus ring */
+}
+
+button {
+	padding: 8px 15px;
+	background-color: #daa520; /* Changed primary button color to goldenrod */
+	color: white;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	margin-top: 10px;
+	margin-right: 5px; /* Space between buttons if needed */
+}
+
+button:hover {
+	background-color: #b8860b; /* Darker goldenrod for hover */
+}
+
+/* Smaller remove button for table */
+.remove-button-small {
+	padding: 3px 8px;
+	font-size: 0.8em;
+	margin-top: 0; /* Reset margin for table context */
+	background-color: #dc3545;
+}
+.remove-button-small:hover {
+	background-color: #c82333;
+}
+
+hr {
+	margin: 20px 0;
+}
+
+/* Add a container for table scrolling */
+.table-container {
+	max-width: 100%; /* Ensure it doesn't overflow the page width */
+	overflow-x: auto; /* Enable horizontal scrolling */
+	position: relative; /* Needed for sticky positioning context */
+	margin-top: 20px; /* Add some space above the table */
+	border: 1px solid #ddd; /* Add border around scrollable area */
+	/* Define column widths as CSS variables for easier calculation */
+	--col-1-width: 60px;
+	--col-2-width: 130px; /* Increased width for Name */
+	--col-3-width: 140px; /* Further increased width for Beginning Balance */
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse; /* Ensures borders look clean */
+	min-width: 1200px; /* Adjusted min-width based on more columns/widths */
+}
+
+th,
+td {
+	border: 1px solid #ddd;
+	padding: 8px 10px; /* Adjust padding */
+	text-align: right; /* Default align numbers to the right */
+	white-space: nowrap; /* Prevent text wrapping */
+}
+
+th {
+	background-color: #f2f2f2; /* Header background */
+	font-weight: bold;
+	/* text-align: center; */ /* Remove general center alignment for headers */
+	position: sticky; /* Make headers sticky */
+	top: 0; /* Stick to the top */
+	z-index: 10; /* Ensure headers stay above scrolling body content */
+	font-size: 1.1em; /* Make font slightly larger */
+	padding-bottom: 12px; /* Add more space below the text */
+}
+
+/* --- Sticky Column Styles using Classes --- */
+
+.sticky-col {
+	position: sticky;
+	background-color: #fff; /* Default background for sticky body cells */
+}
+
+/* Column 1: Year */
+.sticky-col-1 {
+	left: 0;
+	width: var(--col-1-width);
+	min-width: var(--col-1-width);
+	max-width: var(--col-1-width);
+	z-index: 5;
+}
+
+/* Column 2: Name */
+.sticky-col-2 {
+	left: var(--col-1-width); /* Position after col 1 */
+	width: var(--col-2-width);
+	min-width: var(--col-2-width);
+	max-width: var(--col-2-width);
+	z-index: 4;
+}
+
+/* Column 3: Beginning Balance */
+.sticky-col-3 {
+	/* Position after col 1 and col 2 */
+	left: calc(var(--col-1-width) + var(--col-2-width));
+	width: var(--col-3-width);
+	min-width: var(--col-3-width);
+	max-width: var(--col-3-width);
+	z-index: 3;
+}
+
+/* Sticky Header Specific Styles */
+thead .sticky-col {
+	background-color: #f2f2f2; /* Match header background */
+	z-index: 15; /* Higher z-index for header cells */
+	white-space: normal; /* Allow header text to wrap */
+	vertical-align: middle; /* Align wrapped text vertically */
+}
+/* Adjust z-index hierarchy for headers */
+thead .sticky-col-1 {
+	z-index: 17;
+}
+thead .sticky-col-2 {
+	z-index: 16;
+}
+thead .sticky-col-3 {
+	z-index: 15;
+}
+
+/* Text Alignment Classes */
+.text-center {
+	text-align: center !important;
+}
+.text-left {
+	text-align: left !important;
+}
+.text-right {
+	text-align: right !important;
+}
+
+/* Add alternating row colors */
+.scenario-even {
+	background-color: #f9f9f9;
+}
+
+.scenario-odd {
+	background-color: #ffffff;
+}
+
+/* Ensure sticky cells get the correct alternating background */
+.scenario-even .sticky-col {
+	background-color: #f9f9f9;
+}
+.scenario-odd .sticky-col {
+	background-color: #ffffff;
+}
+
+/* Ensure sticky header cells always have header background */
+thead .scenario-even .sticky-col,
+thead .scenario-odd .sticky-col {
+	background-color: #f2f2f2;
+}
+
+/* Style for ended scenarios */
+.scenario-ended {
+	color: #999;
+}
+.scenario-ended td:nth-child(1),
+.scenario-ended td:nth-child(2) {
+	/* Ensure sticky background matches row color even when ended */
+	background-color: inherit;
+}
+
+tbody tr.scenario-odd {
+	background-color: #f9f9f9;
+}
+tbody tr.scenario-even {
+	background-color: #ffffff;
+}
+
+tbody tr:hover {
+	background-color: #eef;
+}
+
+/* --- Scenario Summaries Styles --- */
+.scenario-summaries {
+	display: flex; /* Arrange cards horizontally */
+	flex-wrap: wrap; /* Allow wrapping to next line */
+	gap: 15px; /* Space between cards */
+	margin-bottom: 20px; /* Space below the summaries section */
+}
+
+.scenario-summary-card {
+	border: 1px solid #ccc;
+	border-radius: 5px;
+	padding: 15px;
+	background-color: #f9f9f9;
+	min-width: 200px; /* Ensure cards have some minimum width */
+	box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+}
+
+.scenario-summary-card h3 {
+	margin-top: 0;
+	margin-bottom: 10px;
+	border-bottom: 1px solid #eee;
+	padding-bottom: 5px;
+}
+
+.scenario-summary-card p {
+	margin: 5px 0;
+	font-size: 0.9em;
+}
+
+/* Adjust remove button style if needed */
+.scenario-summary-card .remove-button-small {
+	font-size: 0.8em;
+	padding: 3px 8px;
+}
+
+/* Add CSS rules for the .year-separator class to create visual spacing between years in the table */
+.table-container table tbody tr.year-separator td {
+	padding-bottom: 10px; /* Add padding to the bottom of cells in the separator row */
+	border-bottom: 2px solid #ccc; /* Add a subtle border below the separator row */
+}
+
+/* Optional: Adjust spacing if needed */
+.table-container table tbody tr.year-separator:last-child td {
+	border-bottom: none; /* Remove border from the very last row of the table */
+}
+
+h1 {
+	font-size: 2.2em; /* Increase size for main title */
+	margin-bottom: 20px; /* Add space below main title */
+	/* text-align: center; */ /* Removed centering */
+	/* text-align: left; */ /* Removed explicit left alignment */
+}
+
+h2 {
+	font-size: 1.6em; /* Increase size for section titles */
+	margin-top: 30px; /* Add space above section titles */
+	margin-bottom: 15px; /* Add space below section titles */
+	border-bottom: 1px solid #eee; /* Optional: Add a subtle line below */
+	padding-bottom: 5px; /* Space between text and border */
+	/* text-align: left; */ /* Removed explicit left alignment */
+}
+
+/* --- Add Scenario Form Spacing --- */
+.add-scenario-form > div {
+	margin-bottom: 15px; /* Add space below each form row */
+}
+
+/* Optional: Remove default label margin if it causes too much space */
+/* .add-scenario-form > div > label {
+  margin-bottom: 0; 
+} */

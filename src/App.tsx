@@ -464,87 +464,96 @@ function App() {
 	useEffect(() => {
 		fetch('/config.yaml') // Fetch from the public root
 			.then((response) => {
+				const contentType = response.headers.get('content-type')
+
+				// Check if the server returned HTML instead of YAML
+				if (contentType && contentType.includes('text/html')) {
+					return Promise.resolve(null) // Resolve with null to signal missing/invalid file type
+				}
+
 				if (!response.ok) {
-					// If file not found (404), don't treat as a fatal error
 					if (response.status === 404) {
-						console.warn('config.yaml not found. Starting with empty state.')
-						return null // Signal that config is missing but it's okay
+						return Promise.resolve(null) // Resolve with null for 404
 					}
 					// For other errors, throw to be caught below
 					throw new Error(`HTTP error! status: ${response.status}`)
 				}
-				return response.text()
+				return response.text() // Return text promise for valid responses
 			})
 			.then((yamlText) => {
-				// If response was null (404), skip parsing
+				// This .then now correctly receives null or the text content
 				if (yamlText === null) {
-					setConfigData(null) // Ensure configData is null
+					setConfigData(null)
+					setConfigError(null)
 					return
 				}
 				try {
 					const loadedConfig = jsyaml.load(yamlText) as ConfigData
-					// Basic validation of loaded config structure
 					if (
 						!loadedConfig ||
 						typeof loadedConfig !== 'object' ||
-						!loadedConfig.initialScenarios
+						typeof loadedConfig.homePrice !== 'number' ||
+						typeof loadedConfig.initialInvestments !== 'number' ||
+						!Array.isArray(loadedConfig.initialScenarios)
 					) {
 						throw new Error('Invalid YAML structure')
 					}
 					setConfigData(loadedConfig)
+					setConfigError(null)
 				} catch (e: unknown) {
-					// Changed 'any' to 'unknown'
 					console.error('Error parsing YAML:', e)
-					// Type assertion or check needed if accessing specific properties of e
 					const errorMessage = e instanceof Error ? e.message : String(e)
-					// Set error only if parsing fails, not if file was just missing
 					setConfigError(`Error parsing config.yaml: ${errorMessage}`)
+					setConfigData(null)
 				}
 			})
 			.catch((error) => {
-				// Catch errors thrown from response.ok check or other network issues
-				console.error('Error fetching config.yaml:', error)
-				// Don't set configError here if it was a 404 handled above
-				// Only set for actual fetch errors (network, CORS, etc.)
-				if (!error.message.includes('status: 404')) {
-					setConfigError(`Error fetching config.yaml: ${error.message}`)
+				console.error('Error during fetch/parse process:', error)
+				// Only set for actual fetch errors (network, CORS, etc.) or non-404 HTTP errors
+				if (!error.message?.includes('status: 404')) {
+					// Check message existence
+					setConfigError(
+						`Failed to load or parse config.yaml: ${error.message}`
+					)
 				}
+				setConfigData(null) // Ensure configData is null on fetch error
 			})
 			.finally(() => {
 				setLoadingConfig(false)
 			})
 	}, []) // Empty dependency array ensures this runs only once on mount
 
-	// Initialize state *after* config is loaded
-	// We use default values initially or while loading
-	const [homePrice, setHomePrice] = useState<number>(
-		configData?.homePrice ?? 500000
-	) // Example default
+	// Initialize state *after* config is loaded or loading fails
+	// Use default values initially
+	const DEFAULT_HOME_PRICE = 500000
+	const DEFAULT_INITIAL_INVESTMENTS = 100000
+
+	const [homePrice, setHomePrice] = useState<number>(DEFAULT_HOME_PRICE)
 	const [initialInvestments, setInitialInvestments] = useState<number>(
-		configData?.initialInvestments ?? 100000 // Example default
+		DEFAULT_INITIAL_INVESTMENTS
 	)
 	const [scenarios, setScenarios] = useState<Scenario[]>([])
 
-	// Effect to update state once config is loaded
+	// Effect to update state based on loaded config OR ensure defaults are set if loading finished without valid config
 	useEffect(() => {
-		if (configData) {
-			// Only run if configData is not null
-			setHomePrice(configData.homePrice)
-			setInitialInvestments(configData.initialInvestments)
-			const initialScenarios = createInitialScenariosFromConfig(
-				configData.homePrice,
-				configData.initialScenarios
-			)
-			setScenarios(initialScenarios)
-		} else if (!loadingConfig) {
-			// If loading is finished and configData is still null (e.g., 404 or parse error)
-			// Ensure state uses defaults (already set by useState initial values)
-			// Or explicitly set defaults here if preferred
-			setHomePrice(500000) // Ensure default
-			setInitialInvestments(100000) // Ensure default
-			setScenarios([]) // Ensure empty scenarios
+		if (!loadingConfig) {
+			// Only run after loading attempt is finished
+			if (configData) {
+				setHomePrice(configData.homePrice)
+				setInitialInvestments(configData.initialInvestments)
+				const initialScenarios = createInitialScenariosFromConfig(
+					configData.homePrice,
+					configData.initialScenarios
+				)
+				setScenarios(initialScenarios)
+			} else {
+				// If loading finished and configData is still null (e.g., 404 or parse error)
+				setHomePrice(DEFAULT_HOME_PRICE)
+				setInitialInvestments(DEFAULT_INITIAL_INVESTMENTS)
+				setScenarios([]) // Ensure empty scenarios
+			}
 		}
-	}, [configData, loadingConfig]) // Add loadingConfig dependency
+	}, [configData, loadingConfig]) // Rerun when configData or loadingConfig changes
 
 	// State for the new scenario form
 	// Removed newScenarioType, newInitialMonthlyRent, newAnnualRentIncrease
@@ -663,7 +672,9 @@ function App() {
 
 	// Calculate investment growth data using useMemo (Refactored Logic)
 	const scenariosWithInvestment = useMemo(() => {
-		if (!configData || scenarios.length < 1) return []
+		// Allow calculation even if configData failed to load, using state values.
+		// Only return early if there are truly no scenarios.
+		if (scenarios.length < 1) return []
 
 		const processedScenarios = JSON.parse(
 			JSON.stringify(scenarios)
@@ -738,7 +749,7 @@ function App() {
 		}
 
 		return processedScenarios
-	}, [scenarios, initialInvestments, configData, maxYears, INVESTMENT_RATE]) // Added INVESTMENT_RATE
+	}, [scenarios, initialInvestments, maxYears, INVESTMENT_RATE]) // Removed configData
 
 	// Define an interface for the chart data points
 	interface ChartDataPoint {
@@ -747,22 +758,24 @@ function App() {
 		[key: string]: number | string | null // Allow dynamic keys holding numbers or null
 	}
 
-	// Define metrics to display on the chart
+	// Define metrics to display on the chart, memoized for stability
 	const CHART_METRICS: {
 		key: keyof YearlyPaymentData
 		name: string
 		style: 'solid' | 'dashed' | 'dotted' | 'dash-dot' | 'short-dash'
-	}[] = [
-		{ key: 'totalNetWorth', name: 'Net Worth', style: 'solid' },
-		{ key: 'totalPrincipalPaid', name: 'Principal Paid', style: 'dashed' },
-		{ key: 'totalInterestPaid', name: 'Interest Paid', style: 'dotted' },
-		{
-			key: 'cumulativeInvestmentValue',
-			name: 'Investment Value',
-			style: 'dash-dot',
-		},
-		{ key: 'endingBalance', name: 'Ending Balance', style: 'short-dash' },
-	]
+	}[] = useMemo(() => {
+		return [
+			{ key: 'totalNetWorth', name: 'Net Worth', style: 'solid' as const },
+			{ key: 'totalPrincipalPaid', name: 'Principal Paid', style: 'dashed' as const },
+			{ key: 'totalInterestPaid', name: 'Interest Paid', style: 'dotted' as const },
+			{
+				key: 'cumulativeInvestmentValue',
+				name: 'Investment Value',
+				style: 'dash-dot' as const,
+			},
+			{ key: 'endingBalance', name: 'Ending Balance', style: 'short-dash' as const },
+		]
+	}, []) // Empty dependency array ensures this is created only once
 
 	// Helper function to get dash style for chart lines
 	const getStrokeDashArray = (
@@ -784,34 +797,34 @@ function App() {
 		}
 	}
 
-	// Helper function to prepare data for the chart
-	const prepareChartData = (
-		scenarios: Scenario[],
-		maxYears: number
-	): ChartDataPoint[] => {
-		if (scenarios.length === 0) return []
-
-		const data: ChartDataPoint[] = []
-
-		for (let year = 1; year <= maxYears; year++) {
-			const yearData: ChartDataPoint = { year: `Year ${year}` }
-
-			scenarios.forEach((scenario) => {
-				const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
-				CHART_METRICS.forEach((metric) => {
-					yearData[`${scenario.name}_${metric.key}`] =
-						dataForYear?.[metric.key] ?? null
-				})
-			})
-			data.push(yearData)
-		}
-		return data
-	}
-
 	// --- Prepare data for the chart ---
 	const chartData = useMemo(() => {
+		// Helper function moved inside useMemo
+		const prepareChartData = (
+			scenarios: Scenario[],
+			maxYears: number
+		): ChartDataPoint[] => {
+			if (scenarios.length === 0) return []
+
+			const data: ChartDataPoint[] = []
+
+			for (let year = 1; year <= maxYears; year++) {
+				const yearData: ChartDataPoint = { year: `Year ${year}` }
+
+				scenarios.forEach((scenario) => {
+					const dataForYear = scenario.yearlyData?.find((d) => d.year === year)
+					CHART_METRICS.forEach((metric) => {
+						yearData[`${scenario.name}_${metric.key}`] =
+							dataForYear?.[metric.key] ?? null
+					})
+				})
+				data.push(yearData)
+			}
+			return data
+		}
+
 		return prepareChartData(scenariosWithInvestment, maxYears)
-	}, [scenariosWithInvestment, maxYears]) // Simplified dependencies
+	}, [scenariosWithInvestment, maxYears, CHART_METRICS]) // Added CHART_METRICS dependency
 
 	// Define colors for the chart lines
 	const chartColors = useMemo(() => {
@@ -837,21 +850,32 @@ function App() {
 		return <div>Loading configuration...</div>
 	}
 
-	if (configError) {
-		return <div>Error loading configuration: {configError}</div>
-	}
-
-	if (!configData) {
-		// Should ideally not happen if error handling is correct, but good practice
-		return <div>Configuration not available.</div>
-	}
+	// Display error if one occurred *during loading/parsing*, but still render the app structure
+	// This allows the user to potentially add scenarios even if the initial config failed.
+	// The check for !configData is removed from the main return block below.
 
 	return (
 		<div className="App">
-			<h1>Mortgage Scenario Comparison</h1> {/* Reverted Title */}
+			<h1>Mortgage Scenario Comparison</h1>
+			{configError && ( // Display error prominently if it exists
+				<div
+					style={{
+						color: 'red',
+						marginBottom: '10px',
+						border: '1px solid red',
+						padding: '10px',
+					}}
+				>
+					Configuration Error: {configError}
+					<br />
+					Attempting to proceed with default values.
+				</div>
+			)}
 			{/* --- Global Inputs --- */}
 			<div style={{ display: 'flex', gap: '20px', marginBottom: '10px' }}>
 				<div>
+					{' '}
+					{/* Wrap Home Price input */}
 					<label>
 						Home Price:
 						<input
@@ -868,8 +892,11 @@ function App() {
 							min="0"
 						/>
 					</label>
-				</div>
+				</div>{' '}
+				{/* Close Home Price wrapper */}
 				<div>
+					{' '}
+					{/* Wrap Initial Investments input */}
 					<label>
 						Initial Investments:
 						<input
@@ -879,7 +906,8 @@ function App() {
 							min="0"
 						/>
 					</label>
-				</div>
+				</div>{' '}
+				{/* Close Initial Investments wrapper */}
 			</div>
 			<hr />
 			{/* --- Add New Scenario Form --- (Simplified) */}

@@ -859,7 +859,7 @@ function App() {
 
 	// --- Render Logic ---
 	if (loadingConfig) {
-		return <div>Loading configuration...</div>
+		return <></>
 	}
 
 	// Display error if one occurred *during loading/parsing*, but still render the app structure
